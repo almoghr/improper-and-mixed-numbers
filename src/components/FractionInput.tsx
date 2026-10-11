@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import type { ChallengeDirection, StudentAnswer } from '../types';
 
 interface FractionInputProps {
@@ -19,6 +19,22 @@ export const FractionInput: React.FC<FractionInputProps> = ({
   const wholeRef = useRef<HTMLInputElement>(null);
   const numRef = useRef<HTMLInputElement>(null);
   const denomRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus the primary input on clean state / new question
+  useEffect(() => {
+    if (
+      !disabled &&
+      (answer.whole === undefined || answer.whole === '') &&
+      (answer.numerator === undefined || answer.numerator === '') &&
+      (answer.denominator === undefined || answer.denominator === '')
+    ) {
+      if (direction === 'improper_to_mixed') {
+        wholeRef.current?.focus();
+      } else {
+        numRef.current?.focus();
+      }
+    }
+  }, [direction, disabled, answer.whole, answer.numerator, answer.denominator]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

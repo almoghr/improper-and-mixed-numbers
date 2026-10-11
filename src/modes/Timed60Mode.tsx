@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getRandomChallenge, loadUserStats, saveHighScore } from '../utils/challenges';
+import {
+  getRandomChallenge,
+  getFractionKey,
+  getQuestionKey,
+  loadUserStats,
+  saveHighScore,
+} from '../utils/challenges';
 import type { Challenge, StudentAnswer } from '../types';
 import { FractionInput } from '../components/FractionInput';
 import { soundManager } from '../utils/audio';
@@ -24,6 +30,9 @@ export const Timed60Mode: React.FC = () => {
   const [currentChallenge, setCurrentChallenge] = useState<Challenge>(() => getRandomChallenge(1));
   const [answer, setAnswer] = useState<StudentAnswer>({});
   const [gameEnded, setGameEnded] = useState<boolean>(false);
+
+  // Set of question keys and fraction keys already shown in the current 60s challenge session
+  const usedQuestionKeysRef = useRef<Set<string>>(new Set());
 
   const [history, setHistory] = useState<{
     challenge: Challenge;
@@ -69,7 +78,14 @@ export const Timed60Mode: React.FC = () => {
     setStreak(0);
     setHistory([]);
     setGameEnded(false);
-    setCurrentChallenge(getRandomChallenge(1));
+
+    // Reset used questions for the new 60s session
+    usedQuestionKeysRef.current.clear();
+    const firstChallenge = getRandomChallenge(1, usedQuestionKeysRef.current);
+    usedQuestionKeysRef.current.add(getFractionKey(firstChallenge));
+    usedQuestionKeysRef.current.add(getQuestionKey(firstChallenge));
+
+    setCurrentChallenge(firstChallenge);
     setAnswer({});
     setIsPlaying(true);
   };
@@ -100,11 +116,13 @@ export const Timed60Mode: React.FC = () => {
     // Record history
     setHistory(prev => [...prev, { challenge: currentChallenge, isCorrect }]);
 
+    let nextScore = score;
     if (isCorrect) {
       soundManager.playSuccess();
       const currentMultiplier = streak >= 6 ? 4 : streak >= 4 ? 3 : streak >= 2 ? 2 : 1;
       const pointsEarned = 10 * currentMultiplier;
-      setScore(prev => prev + pointsEarned);
+      nextScore = score + pointsEarned;
+      setScore(nextScore);
       const nextStreak = streak + 1;
       setStreak(nextStreak);
 
@@ -116,10 +134,13 @@ export const Timed60Mode: React.FC = () => {
       setStreak(0);
     }
 
-    // Pick next challenge
-    // Adjust tier based on score
-    const targetTier = score > 150 ? 4 : score > 100 ? 3 : score > 50 ? 2 : 1;
-    setCurrentChallenge(getRandomChallenge(targetTier));
+    // Pick next challenge strictly avoiding any question or fraction seen in this round
+    const targetTier = nextScore > 150 ? 4 : nextScore > 100 ? 3 : nextScore > 50 ? 2 : 1;
+    const nextChallenge = getRandomChallenge(targetTier, usedQuestionKeysRef.current);
+    usedQuestionKeysRef.current.add(getFractionKey(nextChallenge));
+    usedQuestionKeysRef.current.add(getQuestionKey(nextChallenge));
+
+    setCurrentChallenge(nextChallenge);
     setAnswer({});
   };
 
